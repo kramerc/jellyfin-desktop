@@ -1,0 +1,69 @@
+name: build-linux-rpm
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            gcc gcc-c++ cmake ninja-build meson git python3 python3-docutils \
+            rpm-build desktop-file-utils \
+            systemd-devel libdrm-devel \
+            wayland-devel wayland-protocols-devel plasma-wayland-protocols \
+            libxkbcommon-devel libxkbcommon-x11-devel \
+            libxcb-devel xcb-util-cursor-devel \
+            mesa-libGL-devel mesa-libEGL-devel vulkan-headers \
+            libX11-devel libXcomposite-devel libXdamage-devel libXrandr-devel \
+            libXpresent-devel libXScrnSaver-devel \
+            alsa-lib-devel at-spi2-core-devel cairo-devel cups-devel \
+            nss-devel nspr-devel pango-devel \
+            ffmpeg-free-devel libplacebo-devel libass-devel
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Cache CEF
+        uses: actions/cache@v5
+        with:
+          path: |
+            third_party/cef
+            third_party/cef_binary_*
+          key: cef-linux-x86_64-${{ hashFiles('CEF_VERSION') }}
+
+      - name: Download CEF
+        run: python3 dev/tools/download_cef.py
+
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Build RPM
+        run: ./dev/rpm/build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-rpm-x86_64
+          path: dist/jellyfin-desktop-*.rpm
