@@ -31,7 +31,8 @@ jobs:
             mesa-libGL-devel mesa-libEGL-devel vulkan-headers \
             libX11-devel libXcomposite-devel libXdamage-devel libXrandr-devel \
             libXpresent-devel libXScrnSaver-devel \
-            alsa-lib-devel at-spi2-core-devel cairo-devel cups-devel \
+            alsa-lib-devel atk-devel at-spi2-atk-devel at-spi2-core-devel \
+            cairo-devel cups-devel dbus-devel glib2-devel mesa-libgbm-devel \
             nss-devel nspr-devel pango-devel \
             ffmpeg-free-devel libplacebo-devel libass-devel
 
