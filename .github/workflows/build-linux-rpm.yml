@@ -27,7 +27,7 @@ jobs:
             systemd-devel libdrm-devel \
             wayland-devel wayland-protocols-devel plasma-wayland-protocols \
             libxkbcommon-devel libxkbcommon-x11-devel \
-            libxcb-devel xcb-util-cursor-devel \
+            libxcb-devel xcb-util-devel xcb-util-cursor-devel \
             mesa-libGL-devel mesa-libEGL-devel vulkan-headers \
             libX11-devel libXcomposite-devel libXdamage-devel libXrandr-devel \
             libXpresent-devel libXScrnSaver-devel \
