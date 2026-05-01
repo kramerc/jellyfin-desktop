@@ -9,3 +9,8 @@ appimage:
 [linux]
 flatpak:
     ./dev/flatpak/build.sh
+
+# Build RPM from existing build/ directory (outputs to dist/)
+[linux]
+rpm:
+    ./dev/rpm/build.sh

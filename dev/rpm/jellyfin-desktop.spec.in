@@ -1,0 +1,130 @@
+Name:           jellyfin-desktop
+Version:        @RPM_VERSION@
+Release:        @RPM_RELEASE@%{?dist}
+Summary:        Jellyfin Desktop Client
+License:        GPL-2.0-only
+URL:            https://github.com/jellyfin/jellyfin-desktop
+Source0:        %{name}-%{version}.tar
+
+# Skip automatic dependency scanning entirely. The bundled CEF/mpv blobs are
+# self-contained ($ORIGIN runpath); scanning libcef.so (~1.3GB) takes minutes
+# and the resulting deps are wrong anyway. Explicit Requires below cover the
+# system libraries we actually need.
+%global __find_provides %{nil}
+%global __find_requires %{nil}
+
+# CEF binaries are pre-built; skip debug package generation and ELF hardening checks.
+%global debug_package %{nil}
+%undefine _missing_build_ids_terminate_build
+%global _build_id_links none
+
+# Don't strip — binaries were already stripped at build time and CEF in particular
+# can break under aggressive post-strip processing.
+%global __strip /bin/true
+%global __os_install_post %{nil}
+
+Requires:       hicolor-icon-theme
+# Direct NEEDED deps from jellyfin-desktop binary
+Requires:       libwayland-client
+Requires:       systemd-libs
+Requires:       libxkbcommon
+Requires:       libxkbcommon-x11
+Requires:       libxcb
+Requires:       xcb-util-cursor
+Requires:       libglvnd-egl
+Requires:       libglvnd-opengl
+Requires:       libdrm
+# CEF (libcef.so) runtime deps — Chromium needs these
+Requires:       nss
+Requires:       nspr
+Requires:       cups-libs
+Requires:       at-spi2-core
+Requires:       atk
+Requires:       cairo
+Requires:       pango
+Requires:       alsa-lib
+Requires:       mesa-libgbm
+Requires:       vulkan-loader
+
+%description
+Jellyfin Desktop is a native desktop client for Jellyfin media servers. It
+embeds Chromium (via CEF) for the Jellyfin web UI and uses mpv for video
+playback, with a Wayland subsurface for the video layer.
+
+This package bundles CEF and mpv runtime libraries under /opt/jellyfin-desktop.
+
+%prep
+%setup -q
+
+%build
+# No build step — files are staged from the existing build/ directory.
+
+%install
+rm -rf %{buildroot}
+
+# App tree under /opt — CEF locates *.pak / *.so / locales relative to
+# /proc/self/exe, so everything must sit next to the binary.
+install -d -m 0755 %{buildroot}/opt/%{name}
+install -d -m 0755 %{buildroot}/opt/%{name}/locales
+
+install -m 0755 jellyfin-desktop      %{buildroot}/opt/%{name}/
+install -m 0755 chrome-sandbox        %{buildroot}/opt/%{name}/
+install -m 0755 libcef.so             %{buildroot}/opt/%{name}/
+install -m 0755 libEGL.so             %{buildroot}/opt/%{name}/
+install -m 0755 libGLESv2.so          %{buildroot}/opt/%{name}/
+install -m 0755 libvk_swiftshader.so  %{buildroot}/opt/%{name}/
+install -m 0755 libmpv.so.2           %{buildroot}/opt/%{name}/
+
+install -m 0644 chrome_100_percent.pak    %{buildroot}/opt/%{name}/
+install -m 0644 chrome_200_percent.pak    %{buildroot}/opt/%{name}/
+install -m 0644 resources.pak             %{buildroot}/opt/%{name}/
+install -m 0644 icudtl.dat                %{buildroot}/opt/%{name}/
+install -m 0644 v8_context_snapshot.bin   %{buildroot}/opt/%{name}/
+install -m 0644 vk_swiftshader_icd.json   %{buildroot}/opt/%{name}/
+
+cp -a locales/. %{buildroot}/opt/%{name}/locales/
+find %{buildroot}/opt/%{name}/locales -type f -exec chmod 0644 {} +
+
+# /usr/bin launcher — symlink so $ORIGIN-based library resolution still finds
+# bundled libs (the kernel resolves /proc/self/exe through symlinks but the
+# binary's own path lookups use the resolved target).
+install -d -m 0755 %{buildroot}%{_bindir}
+ln -s /opt/%{name}/jellyfin-desktop %{buildroot}%{_bindir}/jellyfin-desktop
+
+# Desktop integration
+install -d -m 0755 %{buildroot}%{_datadir}/applications
+install -d -m 0755 %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
+install -d -m 0755 %{buildroot}%{_datadir}/metainfo
+
+install -m 0644 org.jellyfin.JellyfinDesktop.desktop \
+    %{buildroot}%{_datadir}/applications/
+install -m 0644 org.jellyfin.JellyfinDesktop.svg \
+    %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/
+install -m 0644 org.jellyfin.JellyfinDesktop.metainfo.xml \
+    %{buildroot}%{_datadir}/metainfo/
+
+%files
+%license LICENSE
+/opt/%{name}
+%{_bindir}/jellyfin-desktop
+%{_datadir}/applications/org.jellyfin.JellyfinDesktop.desktop
+%{_datadir}/icons/hicolor/scalable/apps/org.jellyfin.JellyfinDesktop.svg
+%{_datadir}/metainfo/org.jellyfin.JellyfinDesktop.metainfo.xml
+
+%post
+touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
+update-desktop-database -q %{_datadir}/applications &>/dev/null || :
+
+%postun
+if [ $1 -eq 0 ] ; then
+    touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
+    gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor &>/dev/null || :
+fi
+update-desktop-database -q %{_datadir}/applications &>/dev/null || :
+
+%posttrans
+gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor &>/dev/null || :
+
+%changelog
+* @RPM_DATE@ Jellyfin Desktop <noreply@jellyfin.org> - @RPM_VERSION@-@RPM_RELEASE@
+- Built from %{name} @RPM_FULL_VERSION@
